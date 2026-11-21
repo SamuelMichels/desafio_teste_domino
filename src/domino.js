@@ -87,6 +87,9 @@ function definirAbertura(maos) {
 
 const copiarPecas = (pecas) => pecas.map(([a, b]) => [a, b]);
 
+/** Soma dos pontos de todas as pecas de uma mao. */
+const somarMao = (mao) => mao.reduce((soma, peca) => soma + pontos(peca), 0);
+
 const PONTAS = ["esquerda", "direita"];
 
 /** Duas pecas sao a mesma independente da ordem dos lados: [6,3] e [3,6]. */
@@ -118,6 +121,9 @@ export class Partida {
     this.linha = [];
     this.encerrada = false;
     this.vencedor = null;
+    this.motivo = null;
+    this.pontuacao = 0;
+    this.passesSeguidos = 0;
   }
 
 
@@ -128,6 +134,7 @@ export class Partida {
    * jogada invalida nunca deixe a partida pela metade.
    */
   jogar(jogador, peca, ponta = "direita") {
+    this.#exigirEmAndamento();
     this.#exigirVez(jogador);
     const naMao = this.maos[jogador].findIndex((candidata) => mesmaPeca(candidata, peca));
     if (naMao < 0) {
@@ -153,6 +160,12 @@ export class Partida {
       this.linha.push(orientada);
     }
     this.maos[jogador].splice(naMao, 1);
+    this.passesSeguidos = 0;
+
+    if (this.maos[jogador].length === 0) {
+      this.#encerrar("batida", jogador);
+      return;
+    }
     this.vez = 1 - jogador;
   }
 
@@ -180,6 +193,7 @@ export class Partida {
    * entao o jogador repete a compra enquanto continuar sem encaixe.
    */
   comprar(jogador) {
+    this.#exigirEmAndamento();
     this.#exigirVez(jogador);
     if (this.#temEncaixe(jogador)) {
       throw new Error(`O jogador ${jogador} tem encaixe na mao e por isso nao pode comprar.`);
@@ -195,6 +209,7 @@ export class Partida {
    * realmente nao tem o que fazer: sem encaixe na mao e com o monte vazio.
    */
   passar(jogador) {
+    this.#exigirEmAndamento();
     this.#exigirVez(jogador);
     if (this.#temEncaixe(jogador)) {
       throw new Error(`O jogador ${jogador} tem encaixe na mao e por isso nao pode passar.`);
@@ -203,6 +218,43 @@ export class Partida {
       throw new Error("Ainda ha peca no monte: a compra e obrigatoria antes de passar.");
     }
     this.vez = 1 - jogador;
+    this.passesSeguidos += 1;
+
+    if (this.passesSeguidos === 2) {
+      this.#encerrar("trancado");
+    }
+  }
+
+  /**
+   * Fecha a partida e calcula o placar.
+   * Na batida, o vencedor e quem zerou a mao e marca os pontos que sobraram na
+   * mao do adversario. No trancamento, vence a menor soma e o vencedor marca a
+   * mao do perdedor; somas iguais terminam empatadas, sem ponto para ninguem.
+   */
+  #encerrar(motivo, jogadorQueBateu = null) {
+    this.encerrada = true;
+    this.motivo = motivo;
+
+    if (motivo === "batida") {
+      this.vencedor = jogadorQueBateu;
+      this.pontuacao = somarMao(this.maos[1 - jogadorQueBateu]);
+      return;
+    }
+
+    const somas = this.maos.map(somarMao);
+    if (somas[0] === somas[1]) {
+      this.vencedor = null;
+      this.pontuacao = 0;
+      return;
+    }
+    this.vencedor = somas[0] < somas[1] ? 0 : 1;
+    this.pontuacao = Math.max(somas[0], somas[1]);
+  }
+
+  #exigirEmAndamento() {
+    if (this.encerrada) {
+      throw new Error(`A partida ja esta encerrada (${this.motivo}).`);
+    }
   }
 
   #exigirVez(jogador) {
@@ -231,6 +283,8 @@ export class Partida {
       monte: copiarPecas(this.monte),
       encerrada: this.encerrada,
       vencedor: this.vencedor,
+      motivo: this.motivo,
+      pontuacao: this.pontuacao,
     };
   }
 }
