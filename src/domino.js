@@ -50,6 +50,41 @@ function embaralhar(pecas, semente) {
   return copia;
 }
 
+/**
+ * Forca de uma peca na disputa da abertura, em ordem de prioridade:
+ * 1) carroca ganha de qualquer peca que nao seja carroca;
+ * 2) entre pecas do mesmo tipo, a de maior soma;
+ * 3) persistindo o empate, a que tem o maior lado.
+ * Como as 28 pecas sao distintas, esses tres criterios nunca empatam de fato.
+ */
+function forcaNaAbertura([a, b]) {
+  return [a === b ? 1 : 0, a + b, Math.max(a, b)];
+}
+
+const maisForte = (uma, outra) => {
+  const forcaUma = forcaNaAbertura(uma);
+  const forcaOutra = forcaNaAbertura(outra);
+  for (let i = 0; i < forcaUma.length; i++) {
+    if (forcaUma[i] !== forcaOutra[i]) return forcaUma[i] > forcaOutra[i];
+  }
+  return false;
+};
+
+/** Descobre a peca que abre a partida e em qual das duas maos ela esta. */
+function definirAbertura(maos) {
+  let abertura = null;
+  let jogador = 0;
+  maos.forEach((mao, indice) => {
+    mao.forEach((peca) => {
+      if (abertura === null || maisForte(peca, abertura)) {
+        abertura = peca;
+        jogador = indice;
+      }
+    });
+  });
+  return { abertura, jogador };
+}
+
 const copiarPecas = (pecas) => pecas.map(([a, b]) => [a, b]);
 
 export class Partida {
@@ -71,13 +106,28 @@ export class Partida {
       ];
       this.monte = baralho.slice(PECAS_POR_JOGADOR * 2);
     }
+
+    const { abertura, jogador } = definirAbertura(this.maos);
+    this.abertura = abertura;
+    this.vez = jogador;
+    this.linha = [];
+    this.encerrada = false;
+    this.vencedor = null;
   }
 
   /** Retrato do jogo. E sempre uma copia: mexer no retorno nao altera a partida. */
   estado() {
     return {
+      vez: this.vez,
+      abertura: this.abertura === null ? null : [...this.abertura],
+      linha: copiarPecas(this.linha),
+      pontas: this.linha.length === 0
+        ? []
+        : [this.linha[0][0], this.linha[this.linha.length - 1][1]],
       maos: this.maos.map(copiarPecas),
       monte: copiarPecas(this.monte),
+      encerrada: this.encerrada,
+      vencedor: this.vencedor,
     };
   }
 }
