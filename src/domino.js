@@ -87,6 +87,11 @@ function definirAbertura(maos) {
 
 const copiarPecas = (pecas) => pecas.map(([a, b]) => [a, b]);
 
+const PONTAS = ["esquerda", "direita"];
+
+/** Duas pecas sao a mesma independente da ordem dos lados: [6,3] e [3,6]. */
+const mesmaPeca = ([a, b], [c, d]) => (a === c && b === d) || (a === d && b === c);
+
 export class Partida {
   /**
    * @param {object} inicio
@@ -113,6 +118,60 @@ export class Partida {
     this.linha = [];
     this.encerrada = false;
     this.vencedor = null;
+  }
+
+
+  /**
+   * Encaixa uma peca da mao do jogador em uma das pontas da linha.
+   * Na primeira jogada da partida a ponta e irrelevante: a linha esta vazia.
+   * Qualquer recusa lanca Error antes de alterar qualquer coisa, para que uma
+   * jogada invalida nunca deixe a partida pela metade.
+   */
+  jogar(jogador, peca, ponta = "direita") {
+    if (jogador !== this.vez) {
+      throw new Error(`Nao e a vez do jogador ${jogador}.`);
+    }
+    const naMao = this.maos[jogador].findIndex((candidata) => mesmaPeca(candidata, peca));
+    if (naMao < 0) {
+      throw new Error(`A peca [${peca}] nao esta na mao do jogador ${jogador}.`);
+    }
+
+    let orientada;
+    if (this.linha.length === 0) {
+      if (!mesmaPeca(peca, this.abertura)) {
+        throw new Error(`A abertura cabe a peca [${this.abertura}].`);
+      }
+      orientada = [...peca];
+    } else {
+      if (!PONTAS.includes(ponta)) {
+        throw new Error(`Ponta invalida: ${ponta}. Use "esquerda" ou "direita".`);
+      }
+      orientada = this.#orientar(peca, ponta);
+    }
+
+    if (ponta === "esquerda" && this.linha.length > 0) {
+      this.linha.unshift(orientada);
+    } else {
+      this.linha.push(orientada);
+    }
+    this.maos[jogador].splice(naMao, 1);
+    this.vez = 1 - jogador;
+  }
+
+  /** Vira a peca para que o lado que casa com a ponta fique voltado para a linha. */
+  #orientar([a, b], ponta) {
+    const numero = ponta === "direita"
+      ? this.linha[this.linha.length - 1][1]
+      : this.linha[0][0];
+
+    if (ponta === "direita") {
+      if (a === numero) return [a, b];
+      if (b === numero) return [b, a];
+    } else {
+      if (b === numero) return [a, b];
+      if (a === numero) return [b, a];
+    }
+    throw new Error(`A peca [${a},${b}] nao encaixa na ponta ${ponta}, que pede ${numero}.`);
   }
 
   /** Retrato do jogo. E sempre uma copia: mexer no retorno nao altera a partida. */
