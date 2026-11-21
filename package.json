@@ -1,0 +1,9 @@
+{
+  "name": "desafio_teste_domino",
+  "version": "1.0.0",
+  "description": "Casos de teste em JavaScript para uma partida de domino dupla-seis entre 2 jogadores",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
