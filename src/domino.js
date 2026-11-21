@@ -20,3 +20,64 @@ export function criarConjunto() {
 export function pontos([a, b]) {
   return a + b;
 }
+
+const PECAS_POR_JOGADOR = 7;
+
+/**
+ * Gerador pseudoaleatorio com semente (mulberry32). Existe para que o
+ * embaralhamento seja reproduzivel: um caso de teste que depende de sorteio
+ * so vale se rodar igual todas as vezes.
+ */
+function geradorComSemente(semente) {
+  let estado = semente >>> 0;
+  return () => {
+    estado = (estado + 0x6d2b79f5) >>> 0;
+    let x = estado;
+    x = Math.imul(x ^ (x >>> 15), x | 1);
+    x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Fisher-Yates guiado pela semente. */
+function embaralhar(pecas, semente) {
+  const sorteio = geradorComSemente(semente);
+  const copia = [...pecas];
+  for (let i = copia.length - 1; i > 0; i--) {
+    const j = Math.floor(sorteio() * (i + 1));
+    [copia[i], copia[j]] = [copia[j], copia[i]];
+  }
+  return copia;
+}
+
+const copiarPecas = (pecas) => pecas.map(([a, b]) => [a, b]);
+
+export class Partida {
+  /**
+   * @param {object} inicio
+   * @param {number} [inicio.semente] distribui as 28 pecas de forma reproduzivel
+   * @param {number[][][]} [inicio.maos] cenario pronto: a mao de cada jogador
+   * @param {number[][]} [inicio.monte] cenario pronto: o monte de compra
+   */
+  constructor({ semente, maos, monte } = {}) {
+    if (maos) {
+      this.maos = maos.map(copiarPecas);
+      this.monte = copiarPecas(monte ?? []);
+    } else {
+      const baralho = embaralhar(criarConjunto(), semente ?? 0);
+      this.maos = [
+        baralho.slice(0, PECAS_POR_JOGADOR),
+        baralho.slice(PECAS_POR_JOGADOR, PECAS_POR_JOGADOR * 2),
+      ];
+      this.monte = baralho.slice(PECAS_POR_JOGADOR * 2);
+    }
+  }
+
+  /** Retrato do jogo. E sempre uma copia: mexer no retorno nao altera a partida. */
+  estado() {
+    return {
+      maos: this.maos.map(copiarPecas),
+      monte: copiarPecas(this.monte),
+    };
+  }
+}
