@@ -128,9 +128,7 @@ export class Partida {
    * jogada invalida nunca deixe a partida pela metade.
    */
   jogar(jogador, peca, ponta = "direita") {
-    if (jogador !== this.vez) {
-      throw new Error(`Nao e a vez do jogador ${jogador}.`);
-    }
+    this.#exigirVez(jogador);
     const naMao = this.maos[jogador].findIndex((candidata) => mesmaPeca(candidata, peca));
     if (naMao < 0) {
       throw new Error(`A peca [${peca}] nao esta na mao do jogador ${jogador}.`);
@@ -172,6 +170,52 @@ export class Partida {
       if (a === numero) return [b, a];
     }
     throw new Error(`A peca [${a},${b}] nao encaixa na ponta ${ponta}, que pede ${numero}.`);
+  }
+
+
+  /**
+   * Tira a primeira peca do monte para a mao de quem esta na vez.
+   * So e permitido a quem nao tem nenhum encaixe: a compra existe para
+   * destravar o jogador, nao para escolher peca melhor. Comprar nao cede a vez,
+   * entao o jogador repete a compra enquanto continuar sem encaixe.
+   */
+  comprar(jogador) {
+    this.#exigirVez(jogador);
+    if (this.#temEncaixe(jogador)) {
+      throw new Error(`O jogador ${jogador} tem encaixe na mao e por isso nao pode comprar.`);
+    }
+    if (this.monte.length === 0) {
+      throw new Error("O monte esta vazio: nao ha o que comprar.");
+    }
+    this.maos[jogador].push(this.monte.shift());
+  }
+
+  /**
+   * Cede a vez sem jogar. So e permitido no unico caso em que o jogador
+   * realmente nao tem o que fazer: sem encaixe na mao e com o monte vazio.
+   */
+  passar(jogador) {
+    this.#exigirVez(jogador);
+    if (this.#temEncaixe(jogador)) {
+      throw new Error(`O jogador ${jogador} tem encaixe na mao e por isso nao pode passar.`);
+    }
+    if (this.monte.length > 0) {
+      throw new Error("Ainda ha peca no monte: a compra e obrigatoria antes de passar.");
+    }
+    this.vez = 1 - jogador;
+  }
+
+  #exigirVez(jogador) {
+    if (jogador !== this.vez) {
+      throw new Error(`Nao e a vez do jogador ${jogador}.`);
+    }
+  }
+
+  /** O jogador tem alguma peca que encaixe em alguma das duas pontas? */
+  #temEncaixe(jogador) {
+    if (this.linha.length === 0) return true;
+    const pontas = [this.linha[0][0], this.linha[this.linha.length - 1][1]];
+    return this.maos[jogador].some(([a, b]) => pontas.includes(a) || pontas.includes(b));
   }
 
   /** Retrato do jogo. E sempre uma copia: mexer no retorno nao altera a partida. */
